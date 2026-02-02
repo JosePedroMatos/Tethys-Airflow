@@ -1,0 +1,154 @@
+x-airflow-common:
+  &airflow-common
+  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.10.0}
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    # Connect to Host Postgres
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:ZB1xL2diQRO3T5mdKFgE@host.docker.internal:5432/airflow_db
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:ZB1xL2diQRO3T5mdKFgE@host.docker.internal:5432/airflow_db
+    # Connect to Host Redis (Using DB 1 to avoid conflicts with Django on DB 0)
+    AIRFLOW__CELERY__BROKER_URL: redis://host.docker.internal:6379/1
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    TRANSFER_FOLDER: ${TRANSFER_FOLDER}
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    # Shared data storage for Parquet files
+    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    # Mount the docker socket for DockerOperator
+    - /var/run/docker.sock:/var/run/docker.sock
+  user: "${AIRFLOW_UID:-50000}:0"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "7080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    environment:
+      <<: *airflow-common-env
+      DUMB_INIT_SETSID: "0"
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        if [[ -z "${AIRFLOW_UID}" ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: AIRFLOW_UID not set!\e[0m"
+          echo "If you are on Linux, you should set AIRFLOW_UID to your user id"
+          echo
+        fi
+        one_meg=1048576
+        mem_available=$$(awk '/MemAvailable/ {print $$2}' /proc/meminfo)
+        cpus_available=$$(nproc)
+        disk_available=$$(df / | awk 'NR==2 {print $$4}')
+        warning_resources="false"
+        if (( mem_available < 4000 * one_meg )); then
+          echo
+          echo -e "\033[1;33mWARNING!!!: You have less than 4GB memory available. You might face stability issues\e[0m"
+          echo
+          warning_resources="true"
+        fi
+        if (( cpus_available < 2 )); then
+          echo
+          echo -e "\033[1;33mWARNING!!!: You have less than 2 CPUs available. You might face stability issues\e[0m"
+          echo
+          warning_resources="true"
+        fi
+        if (( disk_available < 10 * one_meg )); then
+          echo
+          echo -e "\033[1;33mWARNING!!!: You have less than 10GB disk space available. You might face stability issues\e[0m"
+          echo
+          warning_resources="true"
+        fi
+        if [[ "$${warning_resources}" == "true" ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: You have not enough resources to run Airflow (see above)!\e[0m"
+          echo "Please follow the instructions to increase the resources available to Docker Desktop."
+          echo "See https://docs.docker.com/desktop/settings/windows/#resources"
+        fi
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+    user: "0:0"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}:/sources
+
+  airflow-cli:
+    <<: *airflow-common
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - bash
