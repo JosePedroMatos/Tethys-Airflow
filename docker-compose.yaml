@@ -6,16 +6,15 @@ x-airflow-common:
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-    # Connect to Host Postgres
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:ZB1xL2diQRO3T5mdKFgE@host.docker.internal:5432/airflow_db
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:ZB1xL2diQRO3T5mdKFgE@host.docker.internal:5432/airflow_db
-    # Connect to Host Redis (Using DB 1 to avoid conflicts with Django on DB 0)
-    AIRFLOW__CELERY__BROKER_URL: redis://host.docker.internal:6379/1
+    # PostgreSQL Database Connection
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    # Redis Broker Connection
+    AIRFLOW__CELERY__BROKER_URL: redis://${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    TRANSFER_FOLDER: ${TRANSFER_FOLDER}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs

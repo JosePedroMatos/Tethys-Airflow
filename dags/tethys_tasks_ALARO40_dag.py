@@ -9,6 +9,10 @@ import os
 from pathlib import Path
 import logging
 
+# def test_email_failure():
+#     """Test task to verify email notifications work"""
+#     raise Exception("This is a test failure email - email notifications are working!")
+
 '''
 docker-compose run --rm tethys-tasks ALARO40L_T2M retrieve_and_upload --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 docker-compose run --rm tethys-tasks ALARO40L_TP retrieve_and_upload --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
@@ -48,8 +52,9 @@ default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
     'start_date': datetime(2023, 1, 1),
-    'email_on_failure': False,
+    'email_on_failure': True,
     'email_on_retry': False,
+    'email': ['jpgscm@gmail.com'],  # Add your email here
     'retries': 1,
     'retry_delay': timedelta(minutes=2),
 }
@@ -61,6 +66,7 @@ with DAG(
     schedule_interval='0 */3 * * *', # Every 3 hours (00:00, 03:00, 06:00, ...)
     # Alternatively, for specific times like 06:00 and 18:00, use: '0 6,18 * * *'
     catchup=False,
+    max_active_runs=1,  # Only run one instance at a time, skips backlog
     tags=['tethys', 'alaro', 'wallonie', 'vesdre'],
 ) as dag:
 
@@ -105,6 +111,7 @@ with DAG(
         'network_mode': 'bridge',
         'do_xcom_push': True,
         'mount_tmp_dir': False,
+        'pool': 'tethys_tasks_pool',  # Limit concurrent tethys-tasks calls
     }
 
     # Run the specialized container
@@ -120,6 +127,13 @@ with DAG(
         command=alaro_tp,
         **common_docker_args
     )
+
+    # # Test email notification (remove after testing)
+    # test_email = PythonOperator(
+    #     task_id='test_email_failure',
+    #     python_callable=test_email_failure,
+    #     trigger_rule='all_done'  # Run regardless of previous task status
+    # )
 
     t1 >> t2
 
