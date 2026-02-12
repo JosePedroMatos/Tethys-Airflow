@@ -131,7 +131,8 @@ services:
         fi
         mkdir -p /sources/logs /sources/dags /sources/plugins
         chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
-        exec /entrypoint airflow version
+        /entrypoint airflow version
+        airflow pools set "${AIRFLOW_POOL_NAME:-tethys_tasks_pool}" "${AIRFLOW_POOL_SLOTS:-1}" "${AIRFLOW_POOL_DESC:-Limit concurrent tethys-tasks calls}"
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_UPGRADE: 'true'

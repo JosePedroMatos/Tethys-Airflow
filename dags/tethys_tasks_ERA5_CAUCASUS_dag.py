@@ -14,8 +14,8 @@ import logging
 #     raise Exception("This is a test failure email - email notifications are working!")
 
 '''
-docker-compose run --rm tethys-tasks ALARO40L_T2M retrieve_and_upload --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
-docker-compose run --rm tethys-tasks ALARO40L_TP retrieve_and_upload --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ERA5_TP_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ERA5_T2M_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 '''
 
 # List of variables to pass to the container
@@ -60,32 +60,30 @@ default_args = {
     'start_date': datetime(2023, 1, 1),
     'email_on_failure': True,
     'email_on_retry': False,
-    'email': ['jpgscm@gmail.com'],  # Add your email here
     'email': failure_emails,
     'retries': 1,
     'retry_delay': timedelta(minutes=2),
 }
 
 with DAG(
-    'tethys_alaro_pipeline',
+    'tethys_era5_caucasus_pipeline',
     default_args=default_args,
-    description='Pipeline to retrieve ALARO data via tethys-tasks container',
-    schedule_interval='0 */3 * * *', # Every 3 hours (00:00, 03:00, 06:00, ...)
-    # Alternatively, for specific times like 06:00 and 18:00, use: '0 6,18 * * *'
+    description='Pipeline to retrieve ERA5 Land Caucasus data via tethys-tasks container',
+    schedule_interval='0 10 * * *',
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'alaro', 'wallonie', 'vesdre'],
+    tags=['tethys', 'era5', 'caucasus', 'engurhesi', 'gse'],
 ) as dag:
 
     #region commands
-    class_ = 'ALARO40L_T2M'
-    function_ = 'retrieve_store_and_upload'
+    class_ = 'ERA5_TP_CAUCASUS'
+    function_ = 'retrieve_store_upload_and_cleanup'
     class_args = []
-    class_kwargs = dict(date_from='2026-02-01', download_from_source=True)
+    class_kwargs = dict(date_from='2026-01-01', download_from_source=True)
     fun_args = []
     fun_kwargs = {}
 
-    alaro_t2m = [
+    tp = [
         class_,
         function_,
         '--class_args', json.dumps(class_args),
@@ -94,8 +92,8 @@ with DAG(
         '--fun_kwargs', json.dumps(fun_kwargs)
     ]
 
-    class_ = 'ALARO40L_TP'
-    alaro_tp = [
+    class_ = 'ERA5_T2M_CAUCASUS'
+    t2m = [
         class_,
         function_,
         '--class_args', json.dumps(class_args),
@@ -124,14 +122,14 @@ with DAG(
     # Run the specialized container
     # This assumes retrieve_from_source PRINTS the relative result path to stdout
     t1 = DockerOperator(
-        task_id='retrieve_alarot2m_data',
-        command=alaro_t2m,
+        task_id='retrieve_t2m_data',
+        command=t2m,
         **common_docker_args
     )
 
     t2 = DockerOperator(
-        task_id='retrieve_alarotp_data',
-        command=alaro_tp,
+        task_id='retrieve_tp_data',
+        command=tp,
         **common_docker_args
     )
 
