@@ -76,10 +76,14 @@ with DAG(
 ) as dag:
 
     #region commands
+
+    date_from = (pd.Timestamp.now()-pd.Timedelta('90d')).strftime('%Y-%m-%d')
+    print(f'Attempting update from {date_from}.')
+
     class_ = 'ERA5_TP_CAUCASUS'
     function_ = 'retrieve_store_upload_and_cleanup'
     class_args = []
-    class_kwargs = dict(date_from='2026-01-01', download_from_source=True)
+    class_kwargs = dict(date_from=date_from, download_from_source=True)
     fun_args = []
     fun_kwargs = {}
 
@@ -94,6 +98,16 @@ with DAG(
 
     class_ = 'ERA5_T2M_CAUCASUS'
     t2m = [
+        class_,
+        function_,
+        '--class_args', json.dumps(class_args),
+        '--class_kwargs', json.dumps(class_kwargs),
+        '--fun_args', json.dumps(fun_args),
+        '--fun_kwargs', json.dumps(fun_kwargs)
+    ]
+
+    class_ = 'ERA5_SD_CAUCASUS'
+    sd = [
         class_,
         function_,
         '--class_args', json.dumps(class_args),
@@ -133,6 +147,12 @@ with DAG(
         **common_docker_args
     )
 
+    t3 = DockerOperator(
+        task_id='retrieve_sd_data',
+        command=tp,
+        **common_docker_args
+    )
+
     # # Test email notification (remove after testing)
     # test_email = PythonOperator(
     #     task_id='test_email_failure',
@@ -140,7 +160,7 @@ with DAG(
     #     trigger_rule='all_done'  # Run regardless of previous task status
     # )
 
-    t1 >> t2
+    t1 >> t2 >> t3
 
 if __name__ == "__main__":
     dag.test()
