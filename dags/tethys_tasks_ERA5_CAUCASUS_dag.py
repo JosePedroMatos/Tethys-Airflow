@@ -149,7 +149,7 @@ with DAG(
 
     t3 = DockerOperator(
         task_id='retrieve_sd_data',
-        command=tp,
+        command=sd,
         **common_docker_args
     )
 
