@@ -16,6 +16,7 @@ import logging
 '''
 docker-compose run --rm tethys-tasks ERA5_TP_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 docker-compose run --rm tethys-tasks ERA5_T2M_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ERA5_SD_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 '''
 
 # List of variables to pass to the container
