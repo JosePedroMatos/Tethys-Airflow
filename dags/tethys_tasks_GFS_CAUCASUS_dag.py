@@ -14,8 +14,7 @@ import logging
 #     raise Exception("This is a test failure email - email notifications are working!")
 
 '''
-docker-compose run --rm tethys-tasks GFS_025_TMP_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
-docker-compose run --rm tethys-tasks GFS_025_PRATE_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks GFS_025_TMP_BELGIUM retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 '''
 
 # List of variables to pass to the container
@@ -65,21 +64,25 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
+zone = 'CAUCASUS'
+zone_tags = [zone.lower()]
+schedule_interval = '0 10 * * *'    # minute hour day month weekday
+
 with DAG(
-    'tethys_gfs_caucasus_pipeline',
+    f'tethys_gfs_{zone.lower()}_pipeline',
     default_args=default_args,
-    description='Pipeline to retrieve GFS Caucasus data via tethys-tasks container',
-    schedule_interval='0 10 * * *',
+    description=f'Pipeline to retrieve GFS {zone.capitalize()} data via tethys-tasks container',
+    schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'gfs', 'caucasus', 'engurhesi', 'gse'],
+    tags=['tethys', 'gfs'] + zone_tags,
 ) as dag:
 
     date_from = (pd.Timestamp.now()-pd.Timedelta('2d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
     #region commands
-    class_ = 'GFS_025_TMP_CAUCASUS'
+    class_ = 'GFS_025_TMP_' + zone
     function_ = 'retrieve_store_upload_and_cleanup'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_source=True)
@@ -95,7 +98,7 @@ with DAG(
         '--fun_kwargs', json.dumps(fun_kwargs)
     ]
 
-    class_ = 'GFS_025_PRATE_CAUCASUS'
+    class_ = 'GFS_025_PRATE_' + zone
     tp = [
         class_,
         function_,

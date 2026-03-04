@@ -14,9 +14,7 @@ import logging
 #     raise Exception("This is a test failure email - email notifications are working!")
 
 '''
-docker-compose run --rm tethys-tasks ERA5_TP_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
-docker-compose run --rm tethys-tasks ERA5_T2M_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
-docker-compose run --rm tethys-tasks ERA5_SD_CAUCASUS retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ERA5_TP_BELGIUM retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 '''
 
 # List of variables to pass to the container
@@ -66,14 +64,18 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
+zone = 'CAUCASUS'
+zone_tags = [zone.lower()]
+schedule_interval = '0 10 * * *',    # minute hour day month weekday
+
 with DAG(
-    'tethys_era5_caucasus_pipeline',
+    f'tethys_era5_{zone.lower()}_pipeline',
     default_args=default_args,
-    description='Pipeline to retrieve ERA5 Land Caucasus data via tethys-tasks container',
-    schedule_interval='0 10 * * *',
+    description=f'Pipeline to retrieve ERA5 Land {zone.capitalize()} data via tethys-tasks container',
+    schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'era5', 'caucasus', 'engurhesi', 'gse'],
+    tags=['tethys', 'era5'] + zone_tags,
 ) as dag:
 
     #region commands
@@ -81,7 +83,7 @@ with DAG(
     date_from = (pd.Timestamp.now()-pd.Timedelta('90d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
-    class_ = 'ERA5_TP_CAUCASUS'
+    class_ = 'ERA5_TP_' + zone
     function_ = 'retrieve_store_upload_and_cleanup'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_source=True)
@@ -97,7 +99,7 @@ with DAG(
         '--fun_kwargs', json.dumps(fun_kwargs)
     ]
 
-    class_ = 'ERA5_T2M_CAUCASUS'
+    class_ = 'ERA5_T2M_' + zone
     t2m = [
         class_,
         function_,
@@ -107,7 +109,7 @@ with DAG(
         '--fun_kwargs', json.dumps(fun_kwargs)
     ]
 
-    class_ = 'ERA5_SD_CAUCASUS'
+    class_ = 'ERA5_SD_' + zone
     sd = [
         class_,
         function_,

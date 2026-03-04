@@ -65,13 +65,14 @@ default_args = {
 }
 
 zone = 'BELGIUM'
-zone_tags = ['belgium', 'wallonie']
+zone_tags = [zone.lower(), 'wallonie']
+schedule_interval = '10 10 * * *',
 
 with DAG(
     f'tethys_era5_{zone.lower()}_pipeline',
     default_args=default_args,
     description=f'Pipeline to retrieve ERA5 Land {zone.capitalize()} data via tethys-tasks container',
-    schedule_interval='0 10 10 * *',
+    schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
     tags=['tethys', 'era5'] + zone_tags,

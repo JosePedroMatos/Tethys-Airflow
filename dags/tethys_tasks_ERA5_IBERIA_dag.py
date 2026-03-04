@@ -65,13 +65,14 @@ default_args = {
 }
 
 zone = 'IBERIA'
-zone_tags = ['iberia']
+zone_tags = [zone.lower()]
+schedule_interval = '30 10 * * *',    # minute hour day month weekday
 
 with DAG(
     f'tethys_era5_{zone.lower()}_pipeline',
     default_args=default_args,
     description=f'Pipeline to retrieve ERA5 Land {zone.capitalize()} data via tethys-tasks container',
-    schedule_interval='0 10 30 * *',
+    schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
     tags=['tethys', 'era5'] + zone_tags,
