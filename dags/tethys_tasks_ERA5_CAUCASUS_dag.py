@@ -66,7 +66,7 @@ default_args = {
 
 zone = 'CAUCASUS'
 zone_tags = [zone.lower()]
-schedule_interval = '0 10 * * *',    # minute hour day month weekday
+schedule_interval = '0 12 * * *'    # minute hour day month weekday
 
 with DAG(
     f'tethys_era5_{zone.lower()}_pipeline',

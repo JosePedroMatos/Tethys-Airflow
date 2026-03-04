@@ -66,7 +66,7 @@ default_args = {
 
 zone = 'ZAMBEZI'
 zone_tags = [zone.lower(), 'hcb']
-schedule_interval = '20 10 * * *'    # minute hour day month weekday
+schedule_interval = '20 12 * * *'    # minute hour day month weekday
 
 with DAG(
     f'tethys_era5_{zone.lower()}_pipeline',

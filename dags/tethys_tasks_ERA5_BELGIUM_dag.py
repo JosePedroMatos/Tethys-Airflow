@@ -66,7 +66,7 @@ default_args = {
 
 zone = 'BELGIUM'
 zone_tags = [zone.lower(), 'wallonie']
-schedule_interval = '10 10 * * *',
+schedule_interval = '10 12 * * *'    # minute hour day month weekday
 
 with DAG(
     f'tethys_era5_{zone.lower()}_pipeline',

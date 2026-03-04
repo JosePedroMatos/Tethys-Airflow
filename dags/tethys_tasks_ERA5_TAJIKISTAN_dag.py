@@ -66,7 +66,7 @@ default_args = {
 
 zone = 'TAJIKISTAN'
 zone_tags = [zone.lower()]
-schedule_interval = '50 9 * * *'    # minute hour day month weekday
+schedule_interval = '50 11 * * *'    # minute hour day month weekday
 
 with DAG(
     f'tethys_era5_{zone.lower()}_pipeline',
