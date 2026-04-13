@@ -8,27 +8,15 @@ import json
 import os
 from pathlib import Path
 import logging
+from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
 
 # def test_email_failure():
 #     """Test task to verify email notifications work"""
 #     raise Exception("This is a test failure email - email notifications are working!")
 
 '''
-docker-compose run --rm tethys-tasks GFS_025_TMP_BELGIUM retrieve_store_upload_and_cleanup --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks GFS_025_TMP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
 '''
-
-# List of variables to pass to the container
-TETHYS_VARS = [
-    'AZURE_STORAGE_CONNECTION_STRING',
-    'CLOUD_STORAGE_FOLDER',
-    'CLOUD_PARALLEL_TRANSFERS',
-    'LOCAL_FILE_FOLDER',
-    'STORAGE_FILE_FOLDER',
-    'LOCAL_FILE_FOLDER_DOCKER',
-    'STORAGE_FILE_FOLDER_DOCKER',
-    'CDSAPI_URL',
-    'CDSAPI_KEY'
-]
 
 # Debug prints to Airflow logs
 print("--- TETHYS DEBUG INFO ---")
@@ -39,19 +27,8 @@ if not os.environ.get('LOCAL_FILE_FOLDER_DOCKER'):
     print("WARNING: LOCAL_FILE_FOLDER_DOCKER is empty. This will cause Docker errors.")
 print("-------------------------")
 
-# Building the container environment dictionary
-container_env = {v: os.environ.get(v) for v in TETHYS_VARS if os.environ.get(v)}
-container_env.update({
-    'LOCAL_FILE_FOLDER': os.environ.get('LOCAL_FILE_FOLDER_DOCKER'),
-    'STORAGE_FILE_FOLDER': os.environ.get('STORAGE_FILE_FOLDER_DOCKER'),
-    'TMPDIR': os.environ.get('STORAGE_FILE_FOLDER_DOCKER'), # Fix for "Invalid cross-device link"
-})
-
-failure_emails = [
-    email.strip()
-    for email in os.environ.get('FAILURE_EMAILS', '').split(',')
-    if email.strip()
-]
+container_env = build_container_env()
+failure_emails = get_failure_emails()
 
 default_args = {
     'owner': 'airflow',
@@ -83,7 +60,7 @@ with DAG(
 
     #region commands
     class_ = 'GFS_025_TMP_' + zone
-    function_ = 'retrieve_store_upload_and_cleanup'
+    function_ = 'update'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_source=True)
     fun_args = []

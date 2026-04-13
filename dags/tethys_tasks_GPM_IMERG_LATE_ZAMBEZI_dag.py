@@ -1,4 +1,4 @@
-from airflow import DAG
+﻿from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 from docker.types import Mount
 from datetime import datetime, timedelta
@@ -6,10 +6,6 @@ import pandas as pd
 import json
 import os
 from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
-
-'''
-docker-compose run --rm tethys-tasks ERA5_TP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
-'''
 
 # Debug prints to Airflow logs
 print("--- TETHYS DEBUG INFO ---")
@@ -26,7 +22,7 @@ failure_emails = get_failure_emails()
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2023, 1, 1),
+    'start_date': datetime(2026, 1, 1),
     'email_on_failure': True,
     'email_on_retry': False,
     'email': failure_emails,
@@ -34,61 +30,38 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
-zone = 'BELGIUM'
-zone_tags = [zone.lower(), 'wallonie']
-schedule_interval = '10 12 * * *'    # minute hour day month weekday
+zone = 'ZAMBEZI'
+zone_tags = [zone.lower()]
+schedule_interval = '40 */3 * * *'  # Run every 3 hours, offset by 40 min
 
 with DAG(
-    f'tethys_era5_{zone.lower()}_pipeline',
+    f'tethys_gpm_imerg_late_{zone.lower()}_pipeline',
     default_args=default_args,
-    description=f'Pipeline to retrieve ERA5 Land {zone.capitalize()} data via tethys-tasks container',
+    description=f'Pipeline to retrieve GPM IMERG Late {zone.capitalize()} data via tethys-tasks container',
     schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'era5'] + zone_tags,
+    tags=['tethys', 'gpm', 'imerg'] + zone_tags,
 ) as dag:
 
-    #region commands
-
-    date_from = (pd.Timestamp.now()-pd.Timedelta('90d')).strftime('%Y-%m-%d')
+    date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
-    class_ = 'ERA5_TP_' + zone
+    class_ = 'GPM_IMERG_LATE_' + zone
     function_ = 'update'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_source=True)
     fun_args = []
     fun_kwargs = {}
 
-    tp = [
+    command = [
         class_,
         function_,
         '--class_args', json.dumps(class_args),
         '--class_kwargs', json.dumps(class_kwargs),
         '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
+        '--fun_kwargs', json.dumps(fun_kwargs),
     ]
-
-    class_ = 'ERA5_T2M_' + zone
-    t2m = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
-    ]
-
-    class_ = 'ERA5_SD_' + zone
-    sd = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
-    ]
-    #endregion
 
     common_docker_args = {
         'image': 'tethys-tasks:latest',
@@ -96,7 +69,7 @@ with DAG(
         'auto_remove': 'success',
         'mounts': [
             Mount(source=os.environ.get('LOCAL_FILE_FOLDER'), target=os.environ.get('LOCAL_FILE_FOLDER_DOCKER'), type='bind'),
-            Mount(source=os.environ.get('STORAGE_FILE_FOLDER'), target=os.environ.get('STORAGE_FILE_FOLDER_DOCKER'), type='bind')
+            Mount(source=os.environ.get('STORAGE_FILE_FOLDER'), target=os.environ.get('STORAGE_FILE_FOLDER_DOCKER'), type='bind'),
         ],
         'environment': container_env,
         'docker_url': 'unix://var/run/docker.sock',
@@ -106,27 +79,11 @@ with DAG(
         'pool': 'tethys_tasks_pool',  # Limit concurrent tethys-tasks calls
     }
 
-    # Run the specialized container
-    # This assumes retrieve_from_source PRINTS the relative result path to stdout
     t1 = DockerOperator(
-        task_id='retrieve_t2m_data',
-        command=t2m,
-        **common_docker_args
+        task_id='retrieve_imerg_late_data',
+        command=command,
+        **common_docker_args,
     )
-
-    t2 = DockerOperator(
-        task_id='retrieve_tp_data',
-        command=tp,
-        **common_docker_args
-    )
-
-    t3 = DockerOperator(
-        task_id='retrieve_sd_data',
-        command=sd,
-        **common_docker_args
-    )
-
-    t1 >> t2 >> t3
 
 if __name__ == "__main__":
     dag.test()
