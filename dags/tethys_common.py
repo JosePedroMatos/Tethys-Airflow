@@ -40,6 +40,9 @@ TETHYS_VARS = [
     'CDSE_S3_REGION_NAME',
     'CDSE_S3_BUCKET',
 
+    # Meteofrance's portail-api credentials. Can be obtained freely.
+    'METEOFRANCE_API_KEY', 
+
     # Failure notifications
     'FAILURE_EMAILS',
 ]
