@@ -28,10 +28,15 @@ TETHYS_VARS = [
     # Data from Copernicus. Can be obtained freely.
     'CDSAPI_URL',
     'CDSAPI_KEY',
+    'ERA5_LOCAL_WORLD',
+    'CDS_PROGRESS',
+    'CDS_VERBOSITY',
 
     # Data from NASA (e.g., IMERG). Can be obtained freely.
     'EARTH_DATA_USER',
     'EARTH_DATA_PASSWORD',
+    'PPS_USER',
+    'IMERG_SOURCE',
 
     # CDSE S3 credentials for CLMS downloads. Can be obtained freely.
     'CDSE_S3_ACCESS_KEY',

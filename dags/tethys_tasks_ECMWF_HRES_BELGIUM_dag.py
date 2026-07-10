@@ -1,17 +1,14 @@
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.operators.python import PythonOperator
 from docker.types import Mount
 from datetime import datetime, timedelta
 import pandas as pd
 import json
 import os
-from pathlib import Path
-import logging
 from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
 
 '''
-docker-compose run --rm tethys-tasks GFS_025_TMP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ECMWF_HRES_TP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin\": \"True\"}"
 '''
 
 # Debug prints to Airflow logs
@@ -37,50 +34,38 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
-zone = 'CAUCASUS'
-zone_tags = [zone.lower()]
-schedule_interval = '0 10 * * *'    # minute hour day month weekday
+zone = 'BELGIUM'
+zone_tags = [zone.lower(), 'wallonie']
+schedule_interval = '10 8,20 * * *'
 
 with DAG(
-    f'tethys_gfs_{zone.lower()}_pipeline',
+    f'tethys_ecmwf_hres_{zone.lower()}_pipeline',
     default_args=default_args,
-    description=f'Pipeline to retrieve GFS {zone.capitalize()} data via tethys-tasks container',
+    description=f'Pipeline to retrieve ECMWF HRES {zone.capitalize()} data via tethys-tasks container',
     schedule_interval=schedule_interval,
     catchup=False,
-    max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'gfs'] + zone_tags,
+    max_active_runs=1,
+    tags=['tethys', 'ecmwf', 'hres'] + zone_tags,
 ) as dag:
 
-    date_from = (pd.Timestamp.now()-pd.Timedelta('2d')).strftime('%Y-%m-%d')
+    date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
-    #region commands
-    class_ = 'GFS_025_TMP_' + zone
     function_ = 'update'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 
-    t2m = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
-    ]
-
-    class_ = 'GFS_025_PRATE_' + zone
-    tp = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
-    ]
-    #endregion
+    def make_command(class_name):
+        return [
+            class_name,
+            function_,
+            '--class_args', json.dumps(class_args),
+            '--class_kwargs', json.dumps(class_kwargs),
+            '--fun_args', json.dumps(fun_args),
+            '--fun_kwargs', json.dumps(fun_kwargs),
+        ]
 
     common_docker_args = {
         'image': 'tethys-tasks:latest',
@@ -95,24 +80,28 @@ with DAG(
         'network_mode': 'bridge',
         'do_xcom_push': True,
         'mount_tmp_dir': False,
-        'pool': 'tethys_tasks_pool',  # Limit concurrent tethys-tasks calls
+        'pool': 'tethys_tasks_pool',
     }
 
-    # Run the specialized container
-    # This assumes retrieve_from_source PRINTS the relative result path to stdout
     t1 = DockerOperator(
         task_id='retrieve_t2m_data',
-        command=t2m,
-        **common_docker_args
+        command=make_command(f'ECMWF_HRES_T2M_{zone}'),
+        **common_docker_args,
     )
 
     t2 = DockerOperator(
         task_id='retrieve_tp_data',
-        command=tp,
-        **common_docker_args
+        command=make_command(f'ECMWF_HRES_TP_{zone}'),
+        **common_docker_args,
     )
 
-    t1 >> t2
+    t3 = DockerOperator(
+        task_id='retrieve_sd_data',
+        command=make_command(f'ECMWF_HRES_SD_{zone}'),
+        **common_docker_args,
+    )
+
+    t1 >> t2 >> t3
 
 if __name__ == "__main__":
     dag.test()

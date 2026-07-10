@@ -100,7 +100,7 @@ services:
           echo "If you are on Linux, you should set AIRFLOW_UID to your user id"
           echo
         fi
-        one_meg=1048576
+        one_meg=1024
         mem_available=$$(awk '/MemAvailable/ {print $$2}' /proc/meminfo)
         cpus_available=$$(nproc)
         disk_available=$$(df / | awk 'NR==2 {print $$4}')

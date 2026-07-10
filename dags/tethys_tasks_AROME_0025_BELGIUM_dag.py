@@ -32,7 +32,7 @@ default_args = {
 
 zone = 'BELGIUM'
 zone_tags = [zone.lower(), 'wallonie']
-schedule_interval = '5 */3 * * *'  # Run every 3 hours, offset by 5 min
+schedule_interval = '45 */3 * * *'  # Run every 3 hours, offset by 45 min
 
 with DAG(
     f'tethys_arome_0025_{zone.lower()}_pipeline',
@@ -64,7 +64,7 @@ with DAG(
     }
 
     def make_command(class_: str) -> list:
-        class_kwargs = dict(date_from=date_from, download_from_source=True)
+        class_kwargs = dict(date_from=date_from, download_from_origin=True)
         return [
             class_,
             'update',

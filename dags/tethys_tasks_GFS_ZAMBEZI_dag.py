@@ -15,7 +15,7 @@ from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
 #     raise Exception("This is a test failure email - email notifications are working!")
 
 '''
-docker-compose run --rm tethys-tasks GFS_025_TMP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks GFS_025_TMP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
 '''
 
 # Debug prints to Airflow logs
@@ -62,7 +62,7 @@ with DAG(
     class_ = 'GFS_025_TMP_' + zone
     function_ = 'update'
     class_args = []
-    class_kwargs = dict(date_from=date_from, download_from_source=True)
+    class_kwargs = dict(date_from=date_from, download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 

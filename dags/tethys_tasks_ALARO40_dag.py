@@ -15,8 +15,8 @@ from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
 #     raise Exception("This is a test failure email - email notifications are working!")
 
 '''
-docker-compose run --rm tethys-tasks ALARO40L_T2M update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
-docker-compose run --rm tethys-tasks ALARO40L_TP update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ALARO40L_T2M update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ALARO40L_TP update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
 '''
 
 # Debug prints to Airflow logs
@@ -58,7 +58,7 @@ with DAG(
     class_ = 'ALARO40L_T2M'
     function_ = 'update'
     class_args = []
-    class_kwargs = dict(date_from='2026-02-01', download_from_source=True)
+    class_kwargs = dict(date_from='2026-02-01', download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 

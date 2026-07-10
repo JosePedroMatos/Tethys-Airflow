@@ -50,7 +50,7 @@ with DAG(
     class_ = 'GPM_IMERG_LATE_' + zone
     function_ = 'update'
     class_args = []
-    class_kwargs = dict(date_from=date_from, download_from_source=True)
+    class_kwargs = dict(date_from=date_from, download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 

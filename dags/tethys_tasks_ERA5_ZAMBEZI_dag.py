@@ -11,7 +11,7 @@ import logging
 from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
 
 '''
-docker-compose run --rm tethys-tasks ERA5_TP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_source=True\": \"True\"}"
+docker-compose run --rm tethys-tasks ERA5_TP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
 '''
 
 # Debug prints to Airflow logs
@@ -35,6 +35,7 @@ default_args = {
     'email': failure_emails,
     'retries': 1,
     'retry_delay': timedelta(minutes=2),
+    'priority_weight': -1,
 }
 
 zone = 'ZAMBEZI'
@@ -56,10 +57,10 @@ with DAG(
     date_from = (pd.Timestamp.now()-pd.Timedelta('90d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
-    class_ = 'ERA5_TP_' + zone
+    class_ = 'ERA5W_TP_' + zone
     function_ = 'update'
     class_args = []
-    class_kwargs = dict(date_from=date_from, download_from_source=True)
+    class_kwargs = dict(date_from=date_from, download_from_origin=False)
     fun_args = []
     fun_kwargs = {}
 
@@ -72,7 +73,7 @@ with DAG(
         '--fun_kwargs', json.dumps(fun_kwargs)
     ]
 
-    class_ = 'ERA5_T2M_' + zone
+    class_ = 'ERA5W_T2M_' + zone
     t2m = [
         class_,
         function_,
@@ -82,7 +83,7 @@ with DAG(
         '--fun_kwargs', json.dumps(fun_kwargs)
     ]
 
-    class_ = 'ERA5_SD_' + zone
+    class_ = 'ERA5W_SD_' + zone
     sd = [
         class_,
         function_,
@@ -129,7 +130,7 @@ with DAG(
         **common_docker_args
     )
 
-    t1 >> t2 >> t3
+    t1 >> t3 >> t2
 
 if __name__ == "__main__":
     dag.test()
