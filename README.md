@@ -12,7 +12,17 @@ Backend task management for Tethys
 
 ### 1. Environment Variables
 
-Create a `.env` file in the project root with the following variables (see [.env template](#env-template)):
+Configuration is split across three files (all git-ignored via `*.env*`):
+
+| File | Purpose | How it's loaded |
+|------|---------|-----------------|
+| `.env` | Airflow infra & `AIRFLOW__*` config: UID, admin user, Postgres, Redis, SMTP, pool, `FAILURE_EMAILS`. Also the source of Docker Compose `${...}` interpolation. | Compose `env_file:` + interpolation |
+| `env/.env-tasks` | Credentials/paths for the `tethys-tasks` containers (Copernicus, NASA/IMERG, CDSE, Meteofrance, Dropbox, Azure, folders). | bind-mounted read-only at `/opt/airflow/env`, parsed by `dags/tethys_common.py` |
+| `env/.env-series` | Credentials/paths for the (future) `tethys-series` containers. | same mount, parsed per-DAG |
+
+Only `.env` is read by Docker Compose directly. The `env/.env-*` files are bind-mounted read-only into the Airflow containers and parsed at DAG-parse time by `build_container_env(component)` / `build_mounts(component)`. This isolates each component, so tasks and series may reuse the same variable names (e.g. `LOCAL_FILE_FOLDER`) with **different** values without colliding.
+
+Create `.env` in the project root with the Airflow infra variables:
 
 ```env
 # Airflow UID (use your user ID on Linux, 50000 on Windows/Mac)
@@ -33,7 +43,12 @@ POSTGRES_DB=airflow_db
 REDIS_HOST=host.docker.internal
 REDIS_PORT=6379
 REDIS_DB=1
+
+# Email notifications for task failures
+FAILURE_EMAILS=you@example.com
 ```
+
+Then create `env/.env-tasks` (and `env/.env-series` when needed) holding the download/storage credentials for each component. Every `.env-<component>` file must define the folder variables `LOCAL_FILE_FOLDER`, `STORAGE_FILE_FOLDER`, `LOCAL_FILE_FOLDER_DOCKER`, and `STORAGE_FILE_FOLDER_DOCKER`.
 
 ### 2. Prepare the Docker Image
 

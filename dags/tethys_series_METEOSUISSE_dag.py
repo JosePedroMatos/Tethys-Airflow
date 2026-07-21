@@ -3,21 +3,18 @@ from airflow.providers.docker.operators.docker import DockerOperator
 from datetime import datetime, timedelta
 import pandas as pd
 import json
-import os
-from tethys_common import build_container_env, build_mounts, get_failure_emails
+from tethys_common import build_container_env, build_mounts, get_failure_emails, load_component_config
 
-'''
-docker-compose run --rm tethys-tasks ECMWF_HRES_TP_ZAMBEZI update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin\": \"True\"}"
-'''
+series_config = load_component_config("series")
+container_env = build_container_env("series")
+container_mounts = build_mounts("series")
 
-container_env = build_container_env("tasks")
-container_mounts = build_mounts("tasks")
 failure_emails = get_failure_emails()
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2023, 1, 1),
+    'start_date': datetime(2026, 1, 1),
     'email_on_failure': True,
     'email_on_retry': False,
     'email': failure_emails,
@@ -25,30 +22,28 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
-zone = 'ZAMBEZI'
-zone_tags = [zone.lower(), 'hcb']
-schedule_interval = '20 8,20 * * *'
+schedule_interval = '20 * * * *'  # Every 1 hour
 
 with DAG(
-    f'tethys_ecmwf_hres_{zone.lower()}_pipeline',
+    'tethys_meteosuisse_pipeline',
     default_args=default_args,
-    description=f'Pipeline to retrieve ECMWF HRES {zone.capitalize()} data via tethys-tasks container',
+    description='Pipeline to retrieve MeteoSwiss KODART forecast/observed data via tethys-series container',
     schedule_interval=schedule_interval,
     catchup=False,
-    max_active_runs=1,
-    tags=['tethys', 'ecmwf', 'hres', 'tasks'] + zone_tags,
+    max_active_runs=1,  # Only run one instance at a time, skips backlog
+    tags=['tethys', 'series', 'meteosuisse'],
 ) as dag:
 
     date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
     function_ = 'update'
-    class_args = []
-    class_kwargs = dict(date_from=date_from, download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 
-    def make_command(class_name):
+    def make_command(class_name, download_from_origin):
+        class_args = []
+        class_kwargs = dict(date_from=date_from, download_from_origin=download_from_origin)
         return [
             class_name,
             function_,
@@ -59,7 +54,7 @@ with DAG(
         ]
 
     common_docker_args = {
-        'image': 'tethys-tasks:latest',
+        'image': 'tethys-series:latest',
         'api_version': 'auto',
         'auto_remove': 'success',
         'mounts': container_mounts,
@@ -68,28 +63,23 @@ with DAG(
         'network_mode': 'bridge',
         'do_xcom_push': True,
         'mount_tmp_dir': False,
-        'pool': 'tethys_tasks_pool',
     }
 
+    # Both drivers share the same raw (SOURCE/LOCAL) tier keyed by production time, so only the
+    # first to run needs to hit the MeteoSwiss API; the second reuses whatever the first fetched.
     t1 = DockerOperator(
-        task_id='retrieve_t2m_data',
-        command=make_command(f'ECMWF_HRES_T2M_{zone}'),
+        task_id='retrieve_meteosuisse_forecast',
+        command=make_command('METEOSUISSE_FORECAST', download_from_origin=True),
         **common_docker_args,
     )
 
     t2 = DockerOperator(
-        task_id='retrieve_tp_data',
-        command=make_command(f'ECMWF_HRES_TP_{zone}'),
+        task_id='retrieve_meteosuisse_observed',
+        command=make_command('METEOSUISSE_OBSERVED', download_from_origin=False),
         **common_docker_args,
     )
 
-    t3 = DockerOperator(
-        task_id='retrieve_sd_data',
-        command=make_command(f'ECMWF_HRES_SD_{zone}'),
-        **common_docker_args,
-    )
-
-    t1 >> t2 >> t3
+    t1 >> t2
 
 if __name__ == "__main__":
     dag.test()

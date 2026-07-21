@@ -22,6 +22,8 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     # Shared data storage for Parquet files
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    # Per-component env files (.env-tasks, .env-series) parsed by tethys_common, read-only
+    - ${AIRFLOW_PROJ_DIR:-.}/env:/opt/airflow/env:ro
     # Mount the docker socket for DockerOperator
     - /var/run/docker.sock:/var/run/docker.sock
   user: "${AIRFLOW_UID:-50000}:0"

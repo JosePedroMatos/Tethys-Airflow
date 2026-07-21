@@ -1,14 +1,10 @@
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
-from airflow.operators.python import PythonOperator
-from docker.types import Mount
 from datetime import datetime, timedelta
 import pandas as pd
 import json
 import os
-from pathlib import Path
-import logging
-from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
+from tethys_common import build_container_env, build_mounts, get_failure_emails
 
 # def test_email_failure():
 #     """Test task to verify email notifications work"""
@@ -19,16 +15,8 @@ docker-compose run --rm tethys-tasks ALARO40L_T2M update --class_kwargs "{\"date
 docker-compose run --rm tethys-tasks ALARO40L_TP update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
 '''
 
-# Debug prints to Airflow logs
-print("--- TETHYS DEBUG INFO ---")
-for var in TETHYS_VARS:
-    val = os.environ.get(var)
-    print(f"DEBUG: {var} = {val}")
-if not os.environ.get('LOCAL_FILE_FOLDER_DOCKER'):
-    print("WARNING: LOCAL_FILE_FOLDER_DOCKER is empty. This will cause Docker errors.")
-print("-------------------------")
-
-container_env = build_container_env()
+container_env = build_container_env("tasks")
+container_mounts = build_mounts("tasks")
 failure_emails = get_failure_emails()
 
 default_args = {
@@ -37,7 +25,6 @@ default_args = {
     'start_date': datetime(2023, 1, 1),
     'email_on_failure': True,
     'email_on_retry': False,
-    'email': ['jpgscm@gmail.com'],  # Add your email here
     'email': failure_emails,
     'retries': 1,
     'retry_delay': timedelta(minutes=2),
@@ -51,7 +38,7 @@ with DAG(
     # Alternatively, for specific times like 06:00 and 18:00, use: '0 6,18 * * *'
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'alaro', 'wallonie', 'vesdre'],
+    tags=['tethys', 'alaro', 'wallonie', 'vesdre', 'tasks'],
 ) as dag:
 
     #region commands
@@ -86,10 +73,7 @@ with DAG(
         'image': 'tethys-tasks:latest',
         'api_version': 'auto',
         'auto_remove': 'success',
-        'mounts': [
-            Mount(source=os.environ.get('LOCAL_FILE_FOLDER'), target=os.environ.get('LOCAL_FILE_FOLDER_DOCKER'), type='bind'),
-            Mount(source=os.environ.get('STORAGE_FILE_FOLDER'), target=os.environ.get('STORAGE_FILE_FOLDER_DOCKER'), type='bind')
-        ],
+        'mounts': container_mounts,
         'environment': container_env,
         'docker_url': 'unix://var/run/docker.sock',
         'network_mode': 'bridge',

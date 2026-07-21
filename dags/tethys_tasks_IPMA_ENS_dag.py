@@ -7,7 +7,7 @@ import os
 from tethys_common import build_container_env, build_mounts, get_failure_emails
 
 '''
-docker-compose run --rm tethys-tasks GFS_025_TMP_SWITZERLAND update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin=True\": \"True\"}"
+docker-compose run --rm tethys-tasks IPMA_ENS_TP update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin\": \"True\"}"
 '''
 
 container_env = build_container_env("tasks")
@@ -25,48 +25,36 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
-zone = 'SWITZERLAND'
-zone_tags = [zone.lower()]
-schedule_interval = '40 10 * * *'
+schedule_interval = '0 */3 * * *'  # Every 3 hours
 
 with DAG(
-    f'tethys_gfs_{zone.lower()}_pipeline',
+    'tethys_ipma_ens_pipeline',
     default_args=default_args,
-    description=f'Pipeline to retrieve GFS {zone.capitalize()} data via tethys-tasks container',
+    description='Pipeline to retrieve IPMA ensemble forecast data via tethys-tasks container',
     schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,
-    tags=['tethys', 'gfs', 'tasks'] + zone_tags,
+    tags=['tethys', 'ipma', 'ens', 'atlantic', 'tasks'],
 ) as dag:
 
     date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
-    class_ = 'GFS_025_TMP_' + zone
     function_ = 'update'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 
-    t2m = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
-    ]
-
-    class_ = 'GFS_025_PRATE_' + zone
-    tp = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs)
-    ]
+    def make_command(class_name):
+        return [
+            class_name,
+            function_,
+            '--class_args', json.dumps(class_args),
+            '--class_kwargs', json.dumps(class_kwargs),
+            '--fun_args', json.dumps(fun_args),
+            '--fun_kwargs', json.dumps(fun_kwargs),
+        ]
 
     common_docker_args = {
         'image': 'tethys-tasks:latest',
@@ -83,14 +71,14 @@ with DAG(
 
     t1 = DockerOperator(
         task_id='retrieve_t2m_data',
-        command=t2m,
-        **common_docker_args
+        command=make_command('IPMA_ENS_T2M'),
+        **common_docker_args,
     )
 
     t2 = DockerOperator(
         task_id='retrieve_tp_data',
-        command=tp,
-        **common_docker_args
+        command=make_command('IPMA_ENS_TP'),
+        **common_docker_args,
     )
 
     t1 >> t2

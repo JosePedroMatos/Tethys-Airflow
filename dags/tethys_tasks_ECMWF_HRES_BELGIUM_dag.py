@@ -1,26 +1,17 @@
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
-from docker.types import Mount
 from datetime import datetime, timedelta
 import pandas as pd
 import json
 import os
-from tethys_common import TETHYS_VARS, build_container_env, get_failure_emails
+from tethys_common import build_container_env, build_mounts, get_failure_emails
 
 '''
 docker-compose run --rm tethys-tasks ECMWF_HRES_TP_BELGIUM update --class_kwargs "{\"date_from\": \"'2025-05-01'\", \"download_from_origin\": \"True\"}"
 '''
 
-# Debug prints to Airflow logs
-print("--- TETHYS DEBUG INFO ---")
-for var in TETHYS_VARS:
-    val = os.environ.get(var)
-    print(f"DEBUG: {var} = {val}")
-if not os.environ.get('LOCAL_FILE_FOLDER_DOCKER'):
-    print("WARNING: LOCAL_FILE_FOLDER_DOCKER is empty. This will cause Docker errors.")
-print("-------------------------")
-
-container_env = build_container_env()
+container_env = build_container_env("tasks")
+container_mounts = build_mounts("tasks")
 failure_emails = get_failure_emails()
 
 default_args = {
@@ -45,7 +36,8 @@ with DAG(
     schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,
-    tags=['tethys', 'ecmwf', 'hres'] + zone_tags,
+    tags=['tethys', 'ecmwf', 'hres', 'tasks'
+          ] + zone_tags,
 ) as dag:
 
     date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
@@ -71,10 +63,7 @@ with DAG(
         'image': 'tethys-tasks:latest',
         'api_version': 'auto',
         'auto_remove': 'success',
-        'mounts': [
-            Mount(source=os.environ.get('LOCAL_FILE_FOLDER'), target=os.environ.get('LOCAL_FILE_FOLDER_DOCKER'), type='bind'),
-            Mount(source=os.environ.get('STORAGE_FILE_FOLDER'), target=os.environ.get('STORAGE_FILE_FOLDER_DOCKER'), type='bind')
-        ],
+        'mounts': container_mounts,
         'environment': container_env,
         'docker_url': 'unix://var/run/docker.sock',
         'network_mode': 'bridge',

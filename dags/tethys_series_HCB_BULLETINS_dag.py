@@ -1,13 +1,14 @@
-﻿from airflow import DAG
+from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 from datetime import datetime, timedelta
 import pandas as pd
 import json
-import os
-from tethys_common import build_container_env, build_mounts, get_failure_emails
+from tethys_common import build_container_env, build_mounts, get_failure_emails, load_component_config
 
-container_env = build_container_env("tasks")
-container_mounts = build_mounts("tasks")
+series_config = load_component_config("series")
+container_env = build_container_env("series")
+container_mounts = build_mounts("series")
+
 failure_emails = get_failure_emails()
 
 default_args = {
@@ -21,41 +22,39 @@ default_args = {
     'retry_delay': timedelta(minutes=2),
 }
 
-zone = 'IBERIA'
-zone_tags = [zone.lower()]
-schedule_interval = '30 */3 * * *'  # Run every 3 hours, offset by 30 min
+schedule_interval = '0 11 * * *'  # Daily at 11:00
 
 with DAG(
-    f'tethys_gpm_imerg_late_{zone.lower()}_pipeline',
+    'tethys_hcb_bulletins_pipeline',
     default_args=default_args,
-    description=f'Pipeline to retrieve GPM IMERG Late {zone.capitalize()} data via tethys-tasks container',
+    description='Pipeline to retrieve HCB daily reservoir bulletins via tethys-series container',
     schedule_interval=schedule_interval,
     catchup=False,
     max_active_runs=1,  # Only run one instance at a time, skips backlog
-    tags=['tethys', 'gpm', 'imerg', 'tasks'] + zone_tags,
+    tags=['tethys', 'series', 'hcb'],
 ) as dag:
 
     date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
     print(f'Attempting update from {date_from}.')
 
-    class_ = 'GPM_IMERG_LATE_' + zone
     function_ = 'update'
     class_args = []
     class_kwargs = dict(date_from=date_from, download_from_origin=True)
     fun_args = []
     fun_kwargs = {}
 
-    command = [
-        class_,
-        function_,
-        '--class_args', json.dumps(class_args),
-        '--class_kwargs', json.dumps(class_kwargs),
-        '--fun_args', json.dumps(fun_args),
-        '--fun_kwargs', json.dumps(fun_kwargs),
-    ]
+    def make_command(class_name):
+        return [
+            class_name,
+            function_,
+            '--class_args', json.dumps(class_args),
+            '--class_kwargs', json.dumps(class_kwargs),
+            '--fun_args', json.dumps(fun_args),
+            '--fun_kwargs', json.dumps(fun_kwargs),
+        ]
 
     common_docker_args = {
-        'image': 'tethys-tasks:latest',
+        'image': 'tethys-series:latest',
         'api_version': 'auto',
         'auto_remove': 'success',
         'mounts': container_mounts,
@@ -64,12 +63,11 @@ with DAG(
         'network_mode': 'bridge',
         'do_xcom_push': True,
         'mount_tmp_dir': False,
-        'pool': 'tethys_tasks_pool',  # Limit concurrent tethys-tasks calls
     }
 
     t1 = DockerOperator(
-        task_id='retrieve_imerg_late_data',
-        command=command,
+        task_id='retrieve_hcb_bulletins',
+        command=make_command('HCB_BULLETINS'),
         **common_docker_args,
     )
 
