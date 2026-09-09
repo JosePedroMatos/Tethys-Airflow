@@ -79,6 +79,12 @@ def build_container_env(component: str = 'tasks') -> dict:
         'STORAGE_FILE_FOLDER': cfg['STORAGE_FILE_FOLDER_DOCKER'],
         'TMPDIR': cfg['STORAGE_FILE_FOLDER_DOCKER'],  # Fix for "Invalid cross-device link"
     })
+    # Without this, Python block-buffers stdout into the pipe Docker gives it (the
+    # containers run with no tty), so a task's whole output only reaches the Airflow
+    # log when the process exits -- and nothing at all if execution_timeout kills it
+    # first, which is how a working container ends up looking hung. setdefault, so an
+    # env file can still turn it off.
+    env.setdefault('PYTHONUNBUFFERED', '1')
     return env
 
 

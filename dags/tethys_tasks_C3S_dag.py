@@ -29,7 +29,9 @@ C3S_MODELS = {
     'dwd22':   ('C3S_DWD22_T2M_WORLD',     'C3S_DWD22_TPRATE_WORLD'),
     'cmcc4':   ('C3S_CMCC4_T2M_WORLD',     'C3S_CMCC4_TPRATE_WORLD'),
     'ncep2':   ('C3S_NCEP2_T2M_WORLD',     'C3S_NCEP2_TPRATE_WORLD'),
-    'jma3':    ('C3S_JMA3_T2M_WORLD',      'C3S_JMA3_TPRATE_WORLD'),
+    # jma3 was retired: CDS answers 400 for system 3, so it acquired nothing from 2026.01
+    # while the task still reported success. Same story for ukmo604 -> ukmo610.
+    'jma4':    ('C3S_JMA4_T2M_WORLD',      'C3S_JMA4_TPRATE_WORLD'),
     'eccc5':   ('C3S_ECCC5_T2M_WORLD',     'C3S_ECCC5_TPRATE_WORLD'),
     'bom2':    ('C3S_BOM2_T2M_WORLD',      'C3S_BOM2_TPRATE_WORLD'),
 }
@@ -42,7 +44,10 @@ function_ = 'update'
 class_args = []
 class_kwargs = dict(date_from=date_from, download_from_origin=True)
 fun_args = []
-fun_kwargs = {}
+# Without this, retrieve() skips _check_cutoff and a model that has stopped publishing looks
+# like a successful empty run -- how jma3 stayed green for seven months. C3S sets
+# FAIL_IF_OLDER = 45 days, comfortably longer than the gap between monthly releases.
+fun_kwargs = {'fail_if_older': True}
 
 
 def make_command(class_name):

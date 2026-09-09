@@ -1,7 +1,6 @@
 from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 from datetime import datetime, timedelta
-import pandas as pd
 import json
 from docker.types import Mount
 from tethys_common import build_container_env, build_mounts, get_failure_emails, load_component_config
@@ -49,12 +48,15 @@ with DAG(
     tags=['tethys', 'series', 'nurek'],
 ) as dag:
 
-    date_from = (pd.Timestamp.now() - pd.Timedelta('2d')).strftime('%Y-%m-%d')
-    print(f'Attempting update from {date_from}.')
-
+    # No date_from: the workbook is the full authoritative history and NUREK_RESERVOIR.store()
+    # derives its months from the sheet itself, rewriting only the months whose content changed.
+    # A moving 2-day window here used to bound what store() could write, so any day the sheet
+    # published outside that window was skipped and then frozen by LOOKBACK. The driver's own
+    # DATE_FROM (2024-01-01) now spans the archive, which also keeps repaired months eligible for
+    # the Azure upload. download_from_origin is omitted too: this driver has no fetch step.
     function_ = 'update'
     class_args = []
-    class_kwargs = dict(date_from=date_from, download_from_origin=True)
+    class_kwargs = {}
     fun_args = []
     fun_kwargs = {}
 

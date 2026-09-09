@@ -50,6 +50,63 @@ DRIVERS: list = ['ZRA_RIVER_FLOWS',
            'ROMANDE_ENERGIE',
            'METEOSUISSE_OBSERVED',
            'METEOSUISSE_FORECAST',
+           # The public Wallonie names are right even though the *_PRIVATE twins are the ones
+           # scheduled: this report reads the STORAGE tier only, and both families write the same
+           # parquet files (_discover_drivers excludes the twins for exactly that reason).
+           'HYDROMETRIE_WALLONIE_Q',
+           'HYDROMETRIE_WALLONIE_H',
+           'HYDROMETRIE_WALLONIE_P',
+           'HYDROMETRIE_WALLONIE_HABS',
+           'HYDROMETRIE_WALLONIE_QPREV',
+           # Both Sommer products are listed: unlike the Wallonie twins they write *different*
+           # parquet trees (hourly and daily), so neither covers the other.
+           'SOMMER_ROGUN_HOURLY',
+           'SOMMER_ROGUN_DAILY',
+           # Rogun damdata REST API. All seven live products write their own parquet tree, so each
+           # needs listing. ROGUN_RESTAPI_GAUGE_HYDROMET_AUTO is left out on purpose (it published
+           # nothing after 2021-02-09 and some of its windows answer HTTP 500 permanently, so it
+           # would sit red for ever), and so is ROGUN_RESTAPI_CATALOG -- a station reference with no
+           # freshness to score. GAUGE_SURVEYOR is a manual survey: its REPORTING allows a 60-day
+           # delay, so weeks between readings score green and only a real stall shows.
+           'ROGUN_RESTAPI_WEATHER_BULLETINS',
+           'ROGUN_RESTAPI_WEATHER_BULLETINS_DAILY',
+           'ROGUN_RESTAPI_GAUGE_BULLETINS',
+           'ROGUN_RESTAPI_GAUGE_BULLETINS_DAILY',
+           'ROGUN_RESTAPI_WEATHER_LSI',
+           'ROGUN_RESTAPI_GAUGE_RQ30',
+           'ROGUN_RESTAPI_GAUGE_SURVEYOR',
+           # Portuguese market. The archive-only products (REN_MERCADO_RR_PRICE,
+           # REN_MERCADO_INTRADAY_CONTINUOUS_ENERGY) and REN_MERCADO_PROGRAMME_PHOF are left out on
+           # purpose -- their sources publish nothing today, so they would sit permanently red.
+           'REN_MERCADO_SPOT_PRICES',
+           'REN_MERCADO_SPOT_ENERGY',
+           'REN_MERCADO_AFRR_PRICE',
+           'REN_MERCADO_AFRR_ENERGY',
+           'REN_MERCADO_AFRR_BAND_PRICE',
+           'REN_MERCADO_AFRR_CAPACITY',
+           'REN_MERCADO_MFRR_PRICE',
+           'REN_MERCADO_MFRR_ENERGY',
+           'REN_MERCADO_MFRR_NEEDS',
+           'REN_MERCADO_RESERVE_ACTIVATED_ENERGY',
+           'REN_MERCADO_RESERVE_ACTIVATED_PRICE',
+           'REN_MERCADO_PROGRAMME_PDBF',
+           'REN_MERCADO_PROGRAMME_PDVD',
+           'REN_MERCADO_PROGRAMME_PHF',
+           'REN_MERCADO_AFRR_BAND_UNITS',
+           'REN_DATAHUB_GENERATION',
+           'REN_DATAHUB_HYDRO_BALANCE',
+           'OMIE_DAY_AHEAD_PRICE',
+           'OMIE_INTRADAY_CONTINUOUS_PRICE',
+           # SAIH Duero. The weekly bulletin products (QAFL/QEFL) publish one value per week and
+           # declare that cadence through REPORTING, so the daily grid does not read a bulletin as
+           # six days of missed acquisition. ANUARIO_AFOROS_* is deliberately absent: it imports a
+           # published annual edition that already ends years ago, so it would sit permanently red.
+           'SAIH_DUERO_Q',
+           'SAIH_DUERO_H',
+           'SAIH_DUERO_HALB',
+           'SAIH_DUERO_VALB',
+           'SAIH_DUERO_QAFL',
+           'SAIH_DUERO_QEFL',
            ]
 
 
@@ -235,10 +292,11 @@ with DAG(
         '--class_args', json.dumps([]),
         '--class_kwargs', json.dumps({}),
         '--fun_args', json.dumps([]),
-        # max_locations caps the per-driver drill-down; with 8 drivers aggregated into one
+        # max_locations caps the per-driver drill-down; with 15 drivers aggregated into one
         # Result: line, the default of 99 locations/driver can exceed Docker's ~16KB log-line
-        # limit and get silently truncated before DockerOperator pushes it to XCom.
-        '--fun_kwargs', json.dumps({'drivers': DRIVERS, 'max_locations': 6}),
+        # limit and get silently truncated before DockerOperator pushes it to XCom. Lowered from
+        # 6 to 4 when the Wallonie drivers joined: those carry ~300 locations each.
+        '--fun_kwargs', json.dumps({'drivers': DRIVERS, 'max_locations': 4}),
     ]
 
     report = DockerOperator(
